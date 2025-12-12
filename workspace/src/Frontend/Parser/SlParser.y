@@ -169,7 +169,9 @@ Stmts
 
 Stmt
     -- let x : int = 10;
-    : let id ':' Type '=' Exp ';'  { SLet $2 $4 $6 }
+    : let id ':' Type '=' Exp ';'  { SLet $2 $4 (Just $6) }
+
+    | let id ':' Type ';'          { SLet $2 $4 Nothing }
     
     -- let x = 10; (Inferência)
     | let id '=' Exp ';'           { SLetInfer $2 $4 }
@@ -204,6 +206,7 @@ Exp
     | true          { EValue (VBool True) }
     | false         { EValue (VBool False) }
     | id            { EVar $1 }
+    | id '{' ExpList '}'   { EStruct $1 (reverse $3) }
 
     -- Arrays e Structs
     | '[' ExpList ']'      { EVector (reverse $2) } -- [1, 2, 3]

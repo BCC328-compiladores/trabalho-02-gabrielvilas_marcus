@@ -55,8 +55,12 @@ ppBlock stmts =
 
 ppStmt :: Stmt -> Doc
 ppStmt stmt = case stmt of
-    SLet var t exp -> 
-        text "let" <+> text var <+> colon <+> ppType t <+> equals <+> ppExp exp <> semi
+    SLet var t mExp -> 
+        case mExp of
+            Nothing -> 
+                text "let" <+> text var <+> colon <+> ppType t <> semi
+            Just exp ->
+                text "let" <+> text var <+> colon <+> ppType t <+> equals <+> ppExp exp <> semi
     
     SLetInfer var exp ->
         text "let" <+> text var <+> equals <+> ppExp exp <> semi
@@ -93,8 +97,20 @@ ppElse block = text "else" <+> ppBlock block
 -- Helper para imprimir statements dentro do 'for' sem o ponto e vírgula final
 ppStmtNoSemi :: Stmt -> Doc
 ppStmtNoSemi (SAssign l r) = ppExp l <+> equals <+> ppExp r
+
 ppStmtNoSemi (SLetInfer v e) = text "let" <+> text v <+> equals <+> ppExp e
-ppStmtNoSemi (SLet v t e) = text "let" <+> text v <+> colon <+> ppType t <+> equals <+> ppExp e
+
+-- CORREÇÃO AQUI: Lidando com a nova definição do SLet (Var Type (Maybe Exp))
+ppStmtNoSemi (SLet v t mExp) = 
+  case mExp of
+    -- Caso 1: SEM inicialização (let v : t)
+    Nothing -> 
+      text "let" <+> text v <+> colon <+> ppType t
+    
+    -- Caso 2: COM inicialização (let v : t = exp)
+    Just exp -> 
+      text "let" <+> text v <+> colon <+> ppType t <+> equals <+> ppExp exp
+
 ppStmtNoSemi other = ppStmt other -- Fallback seguro
 
 -- ============================================================================
@@ -122,7 +138,10 @@ ppExp :: Exp -> Doc
 ppExp e = case e of
     EValue v -> ppValue v
     EVar name -> text name
-    
+
+    EStruct name exps -> 
+        text name <> text "{" <> hsep (punctuate comma (map ppExp exps)) <> text "}"
+        
     EVector exps -> brackets (hcat $ punctuate (comma <> space) (map ppExp exps))
     
     ENew t size -> text "new" <+> ppType t <> brackets (ppExp size)

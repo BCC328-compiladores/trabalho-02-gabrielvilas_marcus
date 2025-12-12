@@ -34,7 +34,7 @@ data Type
 
 data Stmt
     = SAssign Exp Exp 
-    | SLet Var Type Exp -- declaraçao de variavel explicitando tipo 
+    | SLet Var Type (Maybe Exp) -- declaraçao de variavel explicitando tipo 
     | SLetInfer Var Exp -- declaraçao de variavel sem tipo explicito
     | SRead Exp -- verificar se havera leitura na linguagem
     | SPrint Exp 
@@ -48,6 +48,7 @@ data Stmt
 data Exp
     = EValue Value 
     | EVector [Exp]
+    | EStruct String [Exp]
     | EIndex Exp Exp -- acesso a índice do array
     | EField Exp String -- acesso a campo de struct
     | EArraySize Exp -- retorna o tamanho do array 
