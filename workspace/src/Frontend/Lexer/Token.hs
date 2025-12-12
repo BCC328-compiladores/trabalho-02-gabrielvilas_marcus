@@ -24,6 +24,7 @@ data Lexeme
   | TokString String
 
   -- Operadores
+  | TokIncrement    -- ++
   | TokAssign       -- =
   | TokPlus         -- +
   | TokMinus        -- -

@@ -13,12 +13,12 @@ data Field
   deriving (Eq, Ord, Show)
 
 data Param 
-    = Param String Type
+    = Param String (Maybe Type)
   deriving (Eq, Ord, Show)
 
 data Definition 
     = DStruct String [Field]
-    | DFunc String [TypeVar] [Param] Type Block-- Generics adicionados: [TypeVar]
+    | Dfunc String [TypeVar] [Param] (Maybe Type) Block-- Generics adicionados: [TypeVar]
     -- Ex: func map<a,b>(...) vira DFunc "map" ["a","b"] ...
   deriving (Eq, Ord, Show)
     -- | Dfunc String [Param] Type Block
@@ -54,6 +54,7 @@ data Exp
     | EArraySize Exp -- retorna o tamanho do array 
     | ENew Type Exp -- declara um novo vetor
     | ECall Exp [Exp] -- chamada de funcao
+    | EIncrement Exp
     | EVar Var 
     | ENot Exp 
     | EMinus Exp

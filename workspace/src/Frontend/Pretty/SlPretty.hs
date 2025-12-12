@@ -11,6 +11,9 @@ prettyPrint (Sl defs) = render $ vcat (map ppDef defs)
 -- ============================================================================
 -- Definições (Top Level)
 -- ============================================================================
+ppFuncRetType :: Maybe Type -> Doc
+ppFuncRetType Nothing = empty -- Não imprime nada se não houver tipo
+ppFuncRetType (Just t) = colon <+> ppType t
 
 ppDef :: Definition -> Doc
 -- Struct
@@ -20,11 +23,10 @@ ppDef (DStruct name fields) =
     $$ rbrace
 
 -- Função
-ppDef (DFunc name typeVars params retType block) = 
-    ppGenerics typeVars 
-    <+> text "func" <+> text name 
-    <> parens (ppParams params) 
-    <+> colon <+> ppType retType 
+ppDef (Dfunc name typeVars params retType block) = 
+    ppGenerics typeVars <+> text "func" <+> text name
+    <> parens (ppParams params)
+    <> ppFuncRetType retType -- Use a nova função auxiliar aqui
     <+> ppBlock block
 
 -- Helper para generics
@@ -37,11 +39,12 @@ ppField :: Field -> Doc
 ppField (Field name t) = text name <+> colon <+> ppType t <> semi
 
 -- Helper para parâmetros de função
-ppParams :: [Param] -> Doc
-ppParams params = hcat $ punctuate (comma <> space) (map ppParam params)
-
 ppParam :: Param -> Doc
-ppParam (Param name t) = text name <+> colon <+> ppType t
+ppParam (Param name Nothing) = text name
+ppParam (Param name (Just t)) = text name <+> colon <+> ppType t
+
+ppParams :: [Param] -> Doc
+ppParams params = hsep (punctuate comma (map ppParam params))
 
 -- ============================================================================
 -- Blocos e Statements
@@ -139,9 +142,11 @@ ppExp e = case e of
     EValue v -> ppValue v
     EVar name -> text name
 
+    EIncrement exp -> ppExp exp <> text "++"
+
     EStruct name exps -> 
         text name <> text "{" <> hsep (punctuate comma (map ppExp exps)) <> text "}"
-        
+
     EVector exps -> brackets (hcat $ punctuate (comma <> space) (map ppExp exps))
     
     ENew t size -> text "new" <+> ppType t <> brackets (ppExp size)

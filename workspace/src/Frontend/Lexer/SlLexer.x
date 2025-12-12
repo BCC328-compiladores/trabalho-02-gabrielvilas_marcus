@@ -66,6 +66,7 @@ tokens :-
   <0> "&&"                { simpleToken TokAnd }
   <0> "||"                { simpleToken TokOr }
   <0> "="                 { simpleToken TokAssign }
+  <0> "++"                { simpleToken TokIncrement }
   <0> "+"                 { simpleToken TokPlus }
   <0> "-"                 { simpleToken TokMinus }
   <0> "*"                 { simpleToken TokTimes }

@@ -51,6 +51,7 @@ import Frontend.Syntax.SlSyntax
     '&&'    { Token _ TokAnd }
     '||'    { Token _ TokOr }
     '!'     { Token _ TokNot }
+    '++'    { Token _ TokIncrement }
     '=='    { Token _ TokEq }
     '!='    { Token _ TokNeq }
     '<'     { Token _ TokLt }
@@ -74,11 +75,12 @@ import Frontend.Syntax.SlSyntax
 -- Isso resolve conflitos e elimina a necessidade de muitos parênteses
 %left '||'
 %left '&&'
-%nonassoc '==' '!=' '<' '>' '<=' '>='
+%nonassoc '==' '!=' '<' '>' '<=' '>=' 
 %left '+' '-'
 %left '*' '/' '%'
 %left '!'           -- Not unário
 %left NEG           -- Menos unário (definido na regra)
+%nonassoc '++'
 %left '[' ']' '.'   -- Acesso a array e struct tem prioridade máxima
 %left '(' ')'       -- Chamada de função
 
@@ -114,11 +116,15 @@ Field
 -- func name(params) : Type { Block }
 -- forall a b . func map (params) : Type { Block }
 FuncDef
-    : func id '(' Params ')' ':' Type '{' Block '}' 
-      { DFunc $2 [] (reverse $4) $7 $9 }
-    
-    | forall TypeVars '.' func id '(' Params ')' ':' Type '{' Block '}'
-      { DFunc $5 (reverse $2) (reverse $7) $10 $12 }
+    : func id '(' Params ')' OptRetType '{' Block '}' 
+      { Dfunc $2 [] (reverse $4) $6 $8 } -- $6 é o tipo de retorno opcional
+
+    | forall TypeVars '.' func id '(' Params ')' OptRetType '{' Block '}'
+      { Dfunc $5 (reverse $2) (reverse $7) $9 $11 } -- $9 é o tipo de retorno opcional
+
+OptRetType
+    : ':' Type      { Just $2 }  -- Caso: : Type (Retorno explícito)
+    | {- empty -}   { Nothing }  -- Caso: Sem tipo de retorno (Inferência)
 
 -- Variáveis de Tipo (Generics): a b c ...
 TypeVars
@@ -134,7 +140,8 @@ ParamsList
     | Param                { [$1] }
 
 Param
-    : id ':' Type { Param $1 $3 }
+    : id ':' Type { Param $1 (Just $3) } -- Explicita (e.g., x : int)
+    | id          { Param $1 Nothing }   -- Inferido (e.g., x)
 
 -- ============================================================================
 -- Tipos
@@ -188,11 +195,14 @@ Stmt
     | if '(' Exp ')' '{' Block '}' else '{' Block '}' { SIf $3 $6 $10 }
     | if '(' Exp ')' '{' Block '}'                    { SIf $3 $6 [] }
     | while '(' Exp ')' '{' Block '}'                 { SWhile $3 $6 }
-    | for '(' Stmt Exp ';' Stmt ')' '{' Block '}'     { SFor $3 $4 $6 $9 } -- Stmt já inclui o ';'
+    | for '(' Stmt Exp ';' StmtNoSemi ')' '{' Block '}'     { SFor $3 $4 $6 $9 } -- Stmt já inclui o ';'
     
     -- Retorno e Expressão solta
     | return Exp ';'               { SReturn $2 }
     | Exp ';'                      { SExpr $1 } -- Chamada de função void: f();
+
+StmtNoSemi
+    : Exp '++'                { SExpr (EIncrement $1) } -- i++
 
 -- ============================================================================
 -- Expressões
@@ -206,7 +216,7 @@ Exp
     | true          { EValue (VBool True) }
     | false         { EValue (VBool False) }
     | id            { EVar $1 }
-    | id '{' ExpList '}'   { EStruct $1 (reverse $3) }
+    | id '{' ExpList '}'  { EStruct $1 (reverse $3) }
 
     -- Arrays e Structs
     | '[' ExpList ']'      { EVector (reverse $2) } -- [1, 2, 3]
@@ -215,6 +225,8 @@ Exp
     -- Acessos (Precedência alta via %left)
     | Exp '[' Exp ']'      { EIndex $1 $3 }         -- arr[i]
     | Exp '.' id           { EField $1 $3 }         -- struct.field
+
+    | Exp '++'             { EIncrement $1 }    -- Incremento: x++
     
     -- Chamada de Função: f(a, b) ou v.f(a)
     | Exp '(' ExpList ')'  { ECall $1 (reverse $3) }
