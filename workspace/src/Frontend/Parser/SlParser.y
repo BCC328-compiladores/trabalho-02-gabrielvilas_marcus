@@ -73,6 +73,7 @@ import Frontend.Syntax.SlSyntax
 
 -- Precedência de Operadores (Do menor para o maior)
 -- Isso resolve conflitos e elimina a necessidade de muitos parênteses
+%right '->'
 %left '||'
 %left '&&'
 %nonassoc '==' '!=' '<' '>' '<=' '>=' 
@@ -81,6 +82,7 @@ import Frontend.Syntax.SlSyntax
 %left '!'           -- Not unário
 %left NEG           -- Menos unário (definido na regra)
 %nonassoc '++'
+%nonassoc PREC_INTLIT
 %left '[' ']' '.'   -- Acesso a array e struct tem prioridade máxima
 %left '(' ')'       -- Chamada de função
 
@@ -155,7 +157,7 @@ Type
     | void        { TVoid }
     | id          { if isTypeVar $1 then TVar $1 else TStruct $1 } 
     | Type '[' ']' { TVector $1 }          -- int[]
-    | Type '[' int_lit ']' { TVectorN $1 $3 } -- int[5]
+    | Type '[' int_lit ']' %prec ']' { TVectorN $1 $3 }
     -- Tipos de função: (int, float) -> bool
     | '(' TypeList ')' '->' Type { TFunc (reverse $2) $5 }
 
@@ -210,7 +212,7 @@ StmtNoSemi
 
 Exp
     -- Literais
-    : int_lit       { EValue (VInt $1) }
+    : int_lit %prec PREC_INTLIT  { EValue (VInt $1) }
     | float_lit     { EValue (VFloat $1) }
     | str_lit       { EValue (VString $1) }
     | true          { EValue (VBool True) }
