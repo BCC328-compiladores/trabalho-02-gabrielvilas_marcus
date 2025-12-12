@@ -178,7 +178,9 @@ Stmt
     -- Importante: Usamos Exp no lado esquerdo (L-Value)
     | Exp '=' Exp ';'              { SAssign $1 $3 }
 
-    | read Exp ';'                 { SRead $2 }
+    | read '(' Exp ')' ';'              { SRead $3 }
+    | print '(' Exp ')' ';'             {SPrint $3} 
+
     
     -- Controle de Fluxo
     | if '(' Exp ')' '{' Block '}' else '{' Block '}' { SIf $3 $6 $10 }
