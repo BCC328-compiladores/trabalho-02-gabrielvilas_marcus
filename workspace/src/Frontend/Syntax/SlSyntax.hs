@@ -10,33 +10,33 @@ type TypeVar = String
 
 data Field 
     = Field String Type
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Param 
     = Param String Type
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 data Definition 
-    = Dstruct String [Field]
-    | Dfunc String [TypeVar] [Param] Type Block-- Generics adicionados: [TypeVar]
+    = DStruct String [Field]
+    | DFunc String [TypeVar] [Param] Type Block-- Generics adicionados: [TypeVar]
     -- Ex: func map<a,b>(...) vira DFunc "map" ["a","b"] ...
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
     -- | Dfunc String [Param] Type Block
 
 data Type 
     = TInt | TFloat | TString | TBool | TVoid
-    | Tvector Type -- vetor dinamico vetor[]
+    | TVector Type -- vetor dinamico vetor[]
     | TVectorN Type Int --vetor estatico vetor[5]
-    | Tstruct String
+    | TStruct String
     | TVar TypeVar --variavel de tipo generico 
     | TFunc [Type] Type
-    deriving (Eq, Show)
+    deriving (Eq, Ord, Show)
 
 data Stmt
     = SAssign Exp Exp 
     | SLet Var Type Exp -- declaraçao de variavel explicitando tipo 
     | SLetInfer Var Exp -- declaraçao de variavel sem tipo explicito
-    | SRead Var -- verificar se havera leitura na linguagem
+    | SRead Exp -- verificar se havera leitura na linguagem
     | SPrint Exp 
     | SIf Exp Block Block 
     | SFor Stmt Exp Stmt Block 
@@ -55,6 +55,7 @@ data Exp
     | ECall Exp [Exp] -- chamada de funcao
     | EVar Var 
     | ENot Exp 
+    | EMinus Exp
     | Exp :+: Exp
     | Exp :-: Exp
     | Exp :*: Exp
