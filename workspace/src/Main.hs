@@ -2,11 +2,13 @@ module Main where
 
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
+import Data.Tree (drawTree)
 
 -- Importações corretas
 import Frontend.Lexer.SlLexer (lexer, runAlex) -- Precisamos importar runAlex
 import Frontend.Parser.SlParser (slParser)
 import Frontend.Pretty.SlPretty (prettyPrint) 
+import Frontend.Parser.AstToTree (astToTree)
 
 main :: IO ()
 main = do
@@ -44,7 +46,10 @@ runParser file = do
         Left err -> do
             putStrLn $ "Erro: " ++ err
             exitFailure
-        Right ast -> print ast 
+        Right ast -> do
+            -- Converte a AST em Data.Tree e usa drawTree para impressão legível
+            let astStringTree = astToTree ast 
+            putStrLn (drawTree astStringTree)
 
 -- Pretty Printer (Usa o Parser Monádico e depois imprime)
 runPretty :: FilePath -> IO ()

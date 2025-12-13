@@ -28,6 +28,7 @@ executable slc
       Frontend.Lexer.SlLexer
       Frontend.Parser.SlParser
       Frontend.Pretty.SlPretty
+      Frontend.Parser.AstToTree
 
   -- Dependências de bibliotecas Haskell
   build-depends:
