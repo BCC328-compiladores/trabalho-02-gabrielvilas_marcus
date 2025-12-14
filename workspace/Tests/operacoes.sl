@@ -14,6 +14,6 @@ func main() : void {
     if (adult && bmi > 25.0) {
         print("Adulto com sobrepeso");
     } else {
-        print("Condição normal");
+        print("Condicao normal");
     }
 }

@@ -18,42 +18,42 @@ data Param
 
 data Definition 
     = DStruct String [Field]
-    | Dfunc String [TypeVar] [Param] (Maybe Type) Block-- Generics adicionados: [TypeVar]
-    -- Ex: func map<a,b>(...) vira DFunc "map" ["a","b"] ...
+    | Dfunc String [TypeVar] [Param] (Maybe Type) Block
+   
   deriving (Eq, Ord, Show)
-    -- | Dfunc String [Param] Type Block
+  
 
 data Type 
     = TInt | TFloat | TString | TBool | TVoid
-    | TVector Type -- vetor dinamico vetor[]
-    | TVectorN Type Int --vetor estatico vetor[5]
+    | TVector Type 
+    | TVectorN Type Int 
     | TStruct String
-    | TVar TypeVar --variavel de tipo generico 
+    | TVar TypeVar 
     | TFunc [Type] Type
     deriving (Eq, Ord, Show)
 
 data Stmt
     = SAssign Exp Exp 
-    | SLet Var Type (Maybe Exp) -- declaraçao de variavel explicitando tipo 
-    | SLetInfer Var Exp -- declaraçao de variavel sem tipo explicito
-    | SRead Exp -- verificar se havera leitura na linguagem
+    | SLet Var Type (Maybe Exp) 
+    | SLetInfer Var Exp 
+    | SRead Exp 
     | SPrint Exp 
     | SIf Exp Block Block 
     | SFor Stmt Exp Stmt Block 
     | SWhile Exp Block 
     | SReturn Exp 
-    | SExpr Exp           -- ÚTIL: Para chamadas de função que ignoram retorno: f(x);
+    | SExpr Exp           
     deriving (Eq, Ord, Show)
 
 data Exp
     = EValue Value 
     | EVector [Exp]
     | EStruct String [Exp]
-    | EIndex Exp Exp -- acesso a índice do array
-    | EField Exp String -- acesso a campo de struct
-    | EArraySize Exp -- retorna o tamanho do array 
-    | ENew Type Exp -- declara um novo vetor
-    | ECall Exp [Exp] -- chamada de funcao
+    | EIndex Exp Exp 
+    | EField Exp String 
+    | EArraySize Exp 
+    | ENew Type Exp
+    | ECall Exp [Exp] 
     | EIncrement Exp
     | EVar Var 
     | ENot Exp 

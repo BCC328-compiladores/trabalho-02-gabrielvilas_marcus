@@ -9,7 +9,7 @@ func main() : void {
     people[0] = Person{"Alice", 25, 1.65};
     people[1] = Person{"Bob", 30, 1.80};
     people[2] = Person{"Charlie", 35, 1.75};
-    // Iteração sobre arranjo
+    // Iteracao sobre arranjo
     let i : int = 0;
     while (i < 3) {
         print(people[i].name);

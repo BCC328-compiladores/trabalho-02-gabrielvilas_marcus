@@ -8,7 +8,6 @@ import Frontend.Lexer.Token
 
 %wrapper "monadUserState"
 
--- Macros (Atalhos de Regex)
 $digit = 0-9
 $alpha = [a-zA-Z]
 @int    = $digit+
@@ -18,13 +17,10 @@ $alpha = [a-zA-Z]
 
 tokens :-
 
-  -- Espaços em branco (ignorados)
   <0> $white+             ;
 
-  -- Comentários de linha
   <0> "//" .* ;
 
-  -- Comentários de bloco aninhados
   <0> "/*"                { nestComment `andBegin` state_comment }
   <0> "*/"                {\ _ _ -> alexError "Error! Unexpected close comment!" }
   <state_comment> "/*"    { nestComment }
@@ -32,7 +28,6 @@ tokens :-
   <state_comment> .       ;
   <state_comment> \n      ;
 
-  -- Palavras Reservadas (Keywords)
   <0> "func"              { simpleToken KW_Func }
   <0> "struct"            { simpleToken KW_Struct }
   <0> "let"               { simpleToken KW_Let }
@@ -47,17 +42,15 @@ tokens :-
   <0> "read"              { simpleToken KW_Read }
   <0> "print"             { simpleToken KW_Print }
 
-  -- Tipos Primitivos
   <0> "int"               { simpleToken KW_Int }
   <0> "float"             { simpleToken KW_Float }
   <0> "string"            { simpleToken KW_String }
   <0> "bool"              { simpleToken KW_Bool }
   
-  -- Literais Booleanos
   <0> "true"              { simpleToken KW_True }
   <0> "false"             { simpleToken KW_False }
 
-  -- Operadores
+
   <0> "->"                { simpleToken TokArrow }
   <0> "=="                { simpleToken TokEq }
   <0> "!="                { simpleToken TokNeq }
@@ -77,7 +70,6 @@ tokens :-
   <0> ">"                 { simpleToken TokGt }
   <0> "."                 { simpleToken TokDot }
 
-  -- Delimitadores
   <0> "("                 { simpleToken TokLParen }
   <0> ")"                 { simpleToken TokRParen }
   <0> "{"                 { simpleToken TokLBrace }
@@ -88,16 +80,13 @@ tokens :-
   <0> ":"                 { simpleToken TokColon }
   <0> ","                 { simpleToken TokComma }
 
-  -- Literais e Identificadores (Regras Genéricas ficam por último!)
   <0> @float              { mkFloat }
   <0> @int                { mkInt }
   <0> @string             { mkString }
   <0> @id                 { mkId }
 
 {
--- ============================================================================
--- Estruturas de Estado do Usuário (para comentários aninhados)
--- ============================================================================
+
 
 data AlexUserState = AlexUserState
   { nestLevel :: Int }
@@ -122,9 +111,6 @@ alexEOF = do
     alexError "Error: unclosed comment"
   pure $ Token (position pos) TokEOF
 
--- ============================================================================
--- Ações Auxiliares
--- ============================================================================
 
 nestComment :: AlexAction Token
 nestComment input len = do
@@ -146,7 +132,6 @@ position (AlexPn _ x y) = (x, y)
 simpleToken :: Lexeme -> AlexAction Token
 simpleToken lx (st, _, _, _) _ = return $ Token (position st) lx
 
--- Construtores de Literais
 
 mkId :: AlexAction Token
 mkId (st, _, _, str) len =
@@ -162,16 +147,12 @@ mkFloat (st, _, _, str) len =
 
 mkString :: AlexAction Token
 mkString (st, _, _, str) len =
-  -- remove as aspas ("...") antes de guardar
+
   let s = take len str
       content = init (tail s) 
   in pure $ Token (position st) (TokString content)
 
--- ============================================================================
--- Função Principal
--- ============================================================================
 
--- Função para o parser Monádico (Happy chama esta)
 alexLexer :: (Token -> Alex a) -> Alex a
 alexLexer cont = do
     tok <- alexMonadScan
