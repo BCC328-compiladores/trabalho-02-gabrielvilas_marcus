@@ -238,10 +238,17 @@ ExpList
 {
 parseError :: Token -> Alex a
 parseError (Token (l, c) lexeme) = 
-    alexError $ "Erro sintatico na linha " ++ show l ++ ", coluna " ++ show c ++ 
-                ". Token inesperado: " ++ show lexeme
+    alexError $ "Syntax error on line " ++ show l ++ ", column " ++ show c ++ 
+            ". Unexpected token: " ++ show lexeme
 
 isTypeVar :: String -> Bool
 isTypeVar (c:cs) = null cs && c `elem` ['a'..'z'] 
 isTypeVar _ = False
+
+
+parseSL :: String -> Either String Sl
+parseSL input = runAlex input $ do
+  ast <- slParser
+  return ast
 }
+

@@ -13,7 +13,7 @@ $alpha = [a-zA-Z]
 @int    = $digit+
 @float  = $digit+ \. $digit+
 @id     = $alpha [$alpha $digit _]* 
-@string = \" .* \" 
+@string = \" ([^\"\\]|\\.)* \"
 
 tokens :-
 
