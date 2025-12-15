@@ -1,46 +1,76 @@
 cabal-version:       2.4
 name:                sl
 version:             0.1.0.0
-synopsis:            Compilador para a linguagem SL (Simple Language)
-license:             MIT
-author:              Aluno BCC328
-maintainer:          aluno@ufop.edu.br
-category:            Language
-build-type:          Simple
 
--- Definição do Executável
-executable slc
-  -- Arquivo principal (onde está a função main)
-  main-is:             Main.hs
-
-  -- Pasta onde estão os códigos fontes
+library
   hs-source-dirs:      src
 
-  -- Linguagem padrão
+  exposed-modules:
+      Frontend.Syntax.SlSyntax
+      Frontend.Lexer.Token
+      Frontend.Lexer.SlLexer
+      Frontend.Parser.SlParser
+      Frontend.Parser.AstToTree
+      Frontend.Pretty.SlPretty
+
   default-language:    Haskell2010
 
-  -- Módulos que compõem o seu projeto (exceto o Main)
-  -- O Cabal é esperto: ao ver SlLexer e SlParser aqui, ele procura
-  -- por .x e .y na pasta src/Frontend/... e roda as ferramentas automaticamente.
+  build-depends:
+      base       >= 4.7 && < 5
+    , array      >= 0.5
+    , pretty     >= 1.1
+    , containers >= 0.6
+
+  build-tool-depends:
+      alex:alex
+    , happy:happy
+
+  ghc-options:
+      -Wall
+      -Wno-unused-matches
+      -Wno-name-shadowing
+
+
+executable slc
+  main-is:             Main.hs
+  hs-source-dirs:      src
+
+  default-language:    Haskell2010
+
   other-modules:
       Frontend.Syntax.SlSyntax
       Frontend.Lexer.Token
       Frontend.Lexer.SlLexer
       Frontend.Parser.SlParser
+      Frontend.Parser.AstToTree
       Frontend.Pretty.SlPretty
 
-  -- Dependências de bibliotecas Haskell
   build-depends:
       base       >= 4.7 && < 5
-    , array      >= 0.5         
-    , pretty     >= 1.1         
-    , containers >= 0.6         
+    , sl
+    , array
+    , pretty
+    , containers
 
-  -- Ferramenta de construção necessárias
-  -- Isso garante que o 'cabal' encontre os executáveis alex e happy
-  build-tool-depends:
-      alex:alex
-    , happy:happy
 
-  -- Opções de compilação (Avisos de erros comuns)
-  ghc-options: -Wall -Wno-unused-matches -Wno-name-shadowing
+
+test-suite sl-tests
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Spec.hs
+  default-language: Haskell2010
+
+  other-modules:
+      LexerSpec
+      ParserSpec
+
+  build-depends:
+      base
+    , sl
+    , array
+    , pretty
+    , containers
+    , tasty
+    , tasty-hunit
+
+ 

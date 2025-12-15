@@ -9,6 +9,9 @@
 \usepackage{xcolor}
 \usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{float}
+\usepackage{fancyvrb}
+
 
 \geometry{a4paper, left=3cm, right=2cm, top=3cm, bottom=2cm}
 
@@ -38,10 +41,14 @@
 
 \lstset{style=mystyle}
 
-\title{Relatório de Projeto: Compilador SL}
+\title{Relatório de Projeto: Compilador SL - Etapa 1}
 \author{
-    Nome do Aluno \\
-    Matrícula: \\
+    Gabriel Vilas Novas Sousa \\
+    Matrícula: 23.1.4018 \\
+    \\
+    Marcus Vinícius Araújo \\
+    Matrícula: 23.1.4129 \\
+    \\
     BCC328 - Construção de Compiladores I - DECOM/UFOP
 }
 \date{\today}
@@ -51,58 +58,217 @@
 \maketitle
 
 \begin{abstract}
+Este relatório apresenta o desenvolvimento da primeira etapa do compilador para a linguagem SL, focando na análise léxica e sintática. O projeto foi implementado em Haskell utilizando as ferramentas \textbf{Alex} e \textbf{Happy}. Foram definidas a gramática formal da linguagem, incluindo suporte a estruturas complexas. O trabalho resultou em um frontend funcional capaz de transformar código fonte em uma Árvore de Sintaxe Abstrata (AST) e reconstruí-lo através de um \textit{Pretty Printer}, lidando corretamente com fatores como a precedência de operadores e comentários aninhados.
 \end{abstract}
 
 \tableofcontents
 
+\newpage
+
 \section{Introdução}
+O objetivo deste trabalho prático é o desenvolvimento de um compilador completo para a linguagem SL, uma linguagem imperativa com tipagem estática, suporte a funções, registros (\textit{structs}), arranjos e polimorfismo paramétrico. O compilador final terá como alvo a geração de código WebAssembly (WAT).
+
+Nesta primeira etapa, o foco reside na construção do \textit{Frontend} do compilador, que compreende:
+\begin{itemize}
+    \item Definição da Gramática Formal da linguagem.
+    \item Implementação do Analisador Léxico (Scanner).
+    \item Implementação do Analisador Sintático (Parser).
+    \item Definição da Árvore de Sintaxe Abstrata (AST).
+    \item Implementação de um formatador de código (\textit{Pretty Printer}).
+\end{itemize}
+
+O projeto foi desenvolvido em linguagem Haskell, utilizando o gerenciador de pacotes Cabal e as ferramentas geradoras de analisadores Alex e Happy.
 
 \section{Metodologia}
 
+A metodologia adotada consistiu na análise incremental das especificações da linguagem SL. Inicialmente, definiu-se a estrutura de dados em Haskell representando a AST. Em seguida, mapearam-se os tokens necessários para o Lexer e, por fim, construiu-se a gramática livre de contexto para o Parser.
+
 \subsection{Estrutura sintática de SL}
+A linguagem SL possui uma sintaxe inspirada em C e Rust. Um programa é composto por uma lista de definições (funções ou estruturas).
+As principais características sintáticas implementadas incluem:
+\begin{itemize}
+    \item \textbf{Declarações:} Uso de \texttt{let} com tipagem explícita ou inferida.
+    \item \textbf{Controle de Fluxo:} Estruturas \texttt{if-else}, \texttt{while} e \texttt{for}.
+    \item \textbf{Tipos Complexos:} Definição de \texttt{structs} e uso de vetores (estáticos e dinâmicos).
+    \item \textbf{Funções:} Suporte a múltiplos parâmetros e passagem de funções como argumento (Funções de Ordem Superior).
+\end{itemize}
 
 \subsection{Sistema de tipos para SL}
+A gramática desenvolvida suporta a sintaxe para os seguintes tipos:
+\begin{itemize}
+    \item Primitivos: \texttt{int}, \texttt{float}, \texttt{string}, \texttt{bool}, \texttt{void}.
+    \item Compostos: \texttt{Type[]} (vetores), \texttt{struct Name}.
+    \item Genéricos: Variáveis de tipo (ex: \texttt{a}, \texttt{b}) geradas pela palavra-chave \texttt{forall}.
+\end{itemize}
 
 \subsection{Inferência de tipos para SL}
+A gramática suporta sintaticamente a inferência de tipos através da construção \texttt{let x = expr;}, que difere da declaração explícita \texttt{let x : Type = expr;}. Na AST, isso é representado pelos construtores distintos \texttt{SLetInfer} e \texttt{SLet}.
 
 \subsection{Semântica operacional para SL}
-
+Nesta etapa, focou-se na representação sintática das operações. A precedência de operadores foi rigorosamente definida no parser para garantir que expressões como \texttt{a + b * c} sejam analisadas como \texttt{a + (b * c)}, respeitando a semântica aritmética padrão.
 
 \section{Arquitetura do Compilador}
 
+O compilador segue uma arquitetura de pipeline clássica, onde a saída de uma fase serve de entrada para a próxima.
+
 \subsection{Análise léxica}
+O analisador léxico foi implementado utilizando a ferramenta \textbf{Alex}. O arquivo \texttt{SlLexer.x} define as expressões regulares para identificar tokens.
+
+A implementação suporta \textbf{comentários aninhados} (ex: \texttt{/* /* ... */ */}). Para isso, utilizou-se o recurso de \textit{User State} do Alex (\texttt{AlexUserState}), mantendo um contador de nível de aninhamento. O Lexer opera dentro de uma Mônada para gerenciar esse estado.
+
+Também foram resolvidas ambiguidades léxicas entre palavras-chave e identificadores utilizando a regra de prioridade do Alex (palavras reservadas são declaradas antes das regras gerais).
+
+\subsection{Gramática da Linguagem}
+\subsubsection{Especificação Formal da Gramática (BNF)}
+
+Abaixo apresenta-se a gramática livre de contexto da linguagem SL, derivada do arquivo de especificação do \textbf{Happy}, o \textbf{SlParser.y}. Os símbolos não-terminais iniciam com letra maiúscula, enquanto os terminais (tokens) estão em minúsculo ou entre aspas. A produção "lambda" representa a cadeia vazia.
+
+\begin{small}
+\begin{verbatim}
+Program     -> Definitions
+
+Definitions -> Definitions Definition
+             | lambda
+
+Definition  -> StructDef
+             | FuncDef
+
+StructDef   -> "struct" id "{" Fields "}"
+
+Fields      -> Fields Field ";"
+             | lambda
+
+Field       -> id ":" Type
+
+FuncDef     -> "func" id "(" Params ")" OptRetType "{" Block "}"
+             | "forall" TypeVars "." "func" id "(" Params ")" OptRetType "{" Block "}"
+
+OptRetType  -> ":" Type
+             | lambda
+
+TypeVars    -> TypeVars id
+             | id
+
+Params      -> ParamsList
+             | lambda
+
+ParamsList  -> ParamsList "," Param
+             | Param
+
+Param       -> id ":" Type
+             | id
+
+Type        -> "int" | "float" | "string" | "bool" | "void"
+             | id
+             | Type "[" "]"             // Vetor dinâmico
+             | Type "[" int_lit "]"     // Vetor estático
+             | "(" TypeList ")" "->" Type
+
+TypeList    -> TypeList "," Type
+             | Type
+
+Block       -> Stmts
+
+Stmts       -> Stmts Stmt
+             | lambda
+
+Stmt        -> "let" id ":" Type "=" Exp ";"
+             | "let" id ":" Type ";"
+             | "let" id "=" Exp ";"
+             | Exp "=" Exp ";"
+             | "read" "(" Exp ")" ";"
+             | "print" "(" Exp ")" ";"
+             | "if" "(" Exp ")" "{" Block "}" "else" "{" Block "}"
+             | "if" "(" Exp ")" "{" Block "}"
+             | "while" "(" Exp ")" "{" Block "}"
+             | "for" "(" Stmt Exp ";" StmtNoSemi ")" "{" Block "}"
+             | "return" Exp ";"
+             | Exp ";"
+
+StmtNoSemi  -> Exp "++"
+
+Exp         -> int_lit | float_lit | str_lit | "true" | "false"
+             | id
+             | id "{" ExpList "}"       // Instanciação de Struct
+             | "[" ExpList "]"          // Literal de Vetor
+             | "new" Type "[" Exp "]"   // Alocação de Vetor
+             | Exp "[" Exp "]"          // Acesso a índice
+             | Exp "." id               // Acesso a campo
+             | Exp "++"
+             | Exp "(" ExpList ")"      // Chamada de função
+             | Exp "(" ")"
+             | Exp "+" Exp | Exp "-" Exp
+             | Exp "*" Exp | Exp "/" Exp | Exp "%" Exp
+             | "-" Exp
+             | Exp "&&" Exp | Exp "||" Exp | "!" Exp
+             | Exp "==" Exp | Exp "!=" Exp
+             | Exp "<" Exp  | Exp ">" Exp
+             | Exp "<=" Exp | Exp ">=" Exp
+             | "(" Exp ")"
+
+ExpList     -> ExpList "," Exp
+             | Exp
+\end{verbatim}
+\end{small}
 
 \subsection{Análise sintática}
+O analisador sintático foi gerado pela ferramenta \textbf{Happy}, baseado em um algoritmo LALR(1). O parser foi configurado para operar de forma monádica (\texttt{\%monad\{Alex\}}), consumindo tokens do lexer sob demanda.
 
-\subsection{Árvore de sintaxe abstrata}
+\subsubsection{Tratamento de Conflitos e Precedência}
+Durante o desenvolvimento, surgiram conflitos de \textbf{shift/reduce}, especialmente em expressões matemáticas e lógicas. Esses conflitos foram resolvidos através da declaração explícita de precedência e associatividade no Happy:
 
-\subsection{Análise semântica}
+\begin{lstlisting}[language=Haskell, caption=Configuração de Precedência no Happy]
+%left '||'
+%left '&&'
+%nonassoc '==' '!=' '<' '>' '<=' '>='
+%left '+' '-'
+%left '*' '/' '%'
+%left '!' 
+\end{lstlisting}
 
-\subsection{Geração de código}
+Além disso, a gramática trata acessos a arrays e structs (\texttt{arr[i]} e \texttt{obj.field}) com precedência máxima, garantindo a correta estruturação da árvore.
+
+Para atender ao requisito de visualização legível da árvore sintática (a flag \texttt{--parser}), foi implementado o módulo auxiliar \texttt{AstToTree.hs}. Este módulo converte a estrutura de dados algébrica da AST para o formato \texttt{Data.Tree}, permitindo a impressão de uma árvore hierárquica formatada em arte ASCII, facilitando a depuração e análise da estrutura gramatical.
+
+\subsection{Árvore de sintaxe abstrata (AST)}
+A AST foi definida no módulo \texttt{SlSyntax.hs}. A estrutura central é o tipo \texttt{Definition}, que pode ser uma \texttt{DFunc} ou \texttt{DStruct}.
+
+Uma decisão de projeto importante foi a definição de atribuições. O comando de atribuição foi definido como \texttt{SAssign Exp Exp} ao invés de \texttt{SAssign Var Exp}. Isso permite representar atribuições a posições de memória complexas, como \texttt{vetor[i] = 10} ou \texttt{struct.campo = 20}, deixando a validação semântica para a próxima etapa.
+
+\subsection{Pretty Printer}
+Foi implementado um módulo \texttt{SlPretty.hs} utilizando a biblioteca \texttt{Text.PrettyPrint}. Este módulo percorre a AST e reconstrói o código original formatado, sendo uma ferramenta crucial de depuração para verificar se o parser construiu a árvore corretamente.
+
+% \subsection{Análise semântica e Geração de código}
 
 \section{Resultados e Discussão}
 
 \subsection{Instruções de Uso}
+O projeto utiliza o \texttt{cabal} para construção. Os comandos disponíveis na CLI são:
 
+\begin{itemize}
+    \item Compilação: \texttt{cabal build}
+    \item Análise Léxica: \texttt{cabal run slc -- --lexer arquivo.sl}
+    \item Análise Sintática: \texttt{cabal run slc -- --parser arquivo.sl}
+    \item Pretty Printer: \texttt{cabal run slc -- --pretty arquivo.sl}
+\end{itemize}
 
 \subsection{Testes Realizados}
+Os testes foram organizados no diretório \texttt{Tests/}, cobrindo as principais funcionalidades da linguagem:
+\begin{enumerate}
+    \item \textbf{Aritmética e Lógica} (\texttt{operacoes.sl}, \texttt{fatorial.sl}): Validam precedência de operadores e recursão.
+    \item \textbf{Tipos Compostos} (\texttt{struct.sl}, \texttt{arranjos.sl}): Validam declaração e acesso a registros e vetores.
+    \item \textbf{Generics e Funções de Ordem Superior} (\texttt{map.sl}): Testam a inferência de tipos genéricos e passagem de funções como argumento.
+    \item \textbf{Funções Básicas} (\texttt{identidade.sl}): Testes unitários simples de definição de função.
+\end{enumerate}
 
+Todos os testes validaram que o fluxo \textit{Lexer $\to$ Parser $\to$ AST $\to$ Pretty Printer} preserva a semântica estrutural do código original.
 
 \subsection{Limitações}
+Nesta etapa, o compilador aceita programas sintaticamente corretos que podem ser semanticamente inválidos (ex: somar uma \texttt{string} com um \texttt{int}). 
 
 \section{Conclusão}
+A primeira etapa do compilador SL foi concluída com sucesso. A utilização de Haskell mostrou-se eficiente para a definição de tipos de dados algébricos que representam a AST de forma concisa.
 
-\section{Referências}
-
-\begin{thebibliography}{9}
-\bibitem{hutton2016}
-Hutton, G. (2016). \emph{Programming in Haskell}. Cambridge University Press.
-
-\bibitem{appel1998}
-Appel, A. W. (1998). \emph{Modern Compiler Implementation in ML}. Cambridge University Press.
-
-\bibitem{webassembly2023}
-WebAssembly Community Group. (2023). \emph{WebAssembly Specification}.
-\end{thebibliography}
+Os principais desafios superados incluíram a gestão de estado no Lexer para comentários aninhados e a resolução de conflitos na gramática do Happy. A arquitetura monádica estabelecida entre o Alex e o Happy fornece uma base sólida para as próximas fases de análise semântica e geração de código WebAssembly.
 
 \end{document}

@@ -6,14 +6,12 @@ import Frontend.Lexer.SlLexer
 import Frontend.Syntax.SlSyntax
 }
 
--- O Parser retorna uma AST do tipo 'Sl'
 %name slParser Sl
 %monad { Alex } { (>>=) } { return }
 %tokentype { Token }
 %error { parseError }
 %lexer { alexLexer } { Token _ TokEOF }
 
--- Mapeamento dos Tokens (Do Token.hs para nomes usáveis na gramática)
 %token
     func    { Token _ KW_Func }
     struct  { Token _ KW_Struct }
@@ -51,6 +49,7 @@ import Frontend.Syntax.SlSyntax
     '&&'    { Token _ TokAnd }
     '||'    { Token _ TokOr }
     '!'     { Token _ TokNot }
+    '++'    { Token _ TokIncrement }
     '=='    { Token _ TokEq }
     '!='    { Token _ TokNeq }
     '<'     { Token _ TokLt }
@@ -70,23 +69,22 @@ import Frontend.Syntax.SlSyntax
     ':'     { Token _ TokColon }
     ','     { Token _ TokComma }
 
--- Precedência de Operadores (Do menor para o maior)
--- Isso resolve conflitos e elimina a necessidade de muitos parênteses
+
+%right '->'
 %left '||'
 %left '&&'
-%nonassoc '==' '!=' '<' '>' '<=' '>='
+%nonassoc '==' '!=' '<' '>' '<=' '>=' 
 %left '+' '-'
 %left '*' '/' '%'
-%left '!'           -- Not unário
-%left NEG           -- Menos unário (definido na regra)
-%left '[' ']' '.'   -- Acesso a array e struct tem prioridade máxima
-%left '(' ')'       -- Chamada de função
+%left '!'           
+%left NEG           
+%nonassoc '++'
+%nonassoc PREC_INTLIT
+%left '[' ']' '.'   
+%left '(' ')'       
 
 %%
 
--- ============================================================================
--- Gramática Principal
--- ============================================================================
 
 Sl : Definitions { Sl (reverse $1) }
 
@@ -98,8 +96,7 @@ Definition
     : StructDef { $1 }
     | FuncDef   { $1 }
 
--- Definição de Struct
--- struct Name { field : Type; ... }
+
 StructDef 
     : struct id '{' Fields '}' { DStruct $2 (reverse $4) }
 
@@ -110,17 +107,19 @@ Fields
 Field 
     : id ':' Type { Field $1 $3 }
 
--- Definição de Função
--- func name(params) : Type { Block }
--- forall a b . func map (params) : Type { Block }
-FuncDef
-    : func id '(' Params ')' ':' Type '{' Block '}' 
-      { DFunc $2 [] (reverse $4) $7 $9 }
-    
-    | forall TypeVars '.' func id '(' Params ')' ':' Type '{' Block '}'
-      { DFunc $5 (reverse $2) (reverse $7) $10 $12 }
 
--- Variáveis de Tipo (Generics): a b c ...
+FuncDef
+    : func id '(' Params ')' OptRetType '{' Block '}' 
+      { Dfunc $2 [] (reverse $4) $6 $8 } 
+
+    | forall TypeVars '.' func id '(' Params ')' OptRetType '{' Block '}'
+      { Dfunc $5 (reverse $2) (reverse $7) $9 $11 } 
+
+OptRetType
+    : ':' Type      { Just $2 }  
+    | {- empty -}   { Nothing }  
+
+
 TypeVars
     : TypeVars id { $2 : $1 }
     | id          { [$1] }
@@ -134,11 +133,10 @@ ParamsList
     | Param                { [$1] }
 
 Param
-    : id ':' Type { Param $1 $3 }
+    : id ':' Type { Param $1 (Just $3) } 
+    | id          { Param $1 Nothing }   
 
--- ============================================================================
--- Tipos
--- ============================================================================
+
 
 Type
     : int         { TInt }
@@ -147,18 +145,15 @@ Type
     | bool        { TBool }
     | void        { TVoid }
     | id          { if isTypeVar $1 then TVar $1 else TStruct $1 } 
-    | Type '[' ']' { TVector $1 }          -- int[]
-    | Type '[' int_lit ']' { TVectorN $1 $3 } -- int[5]
-    -- Tipos de função: (int, float) -> bool
+    | Type '[' ']' { TVector $1 }          
+    | Type '[' int_lit ']' %prec ']' { TVectorN $1 $3 }
     | '(' TypeList ')' '->' Type { TFunc (reverse $2) $5 }
 
 TypeList
     : TypeList ',' Type { $3 : $1 }
     | Type              { [$1] }
 
--- ============================================================================
--- Statements (Comandos)
--- ============================================================================
+
 
 Block 
     : Stmts { reverse $1 }
@@ -168,67 +163,65 @@ Stmts
     | {- empty -} { [] }
 
 Stmt
-    -- let x : int = 10;
-    : let id ':' Type '=' Exp ';'  { SLet $2 $4 $6 }
     
-    -- let x = 10; (Inferência)
+    : let id ':' Type '=' Exp ';'  { SLet $2 $4 (Just $6) }
+
+    | let id ':' Type ';'          { SLet $2 $4 Nothing }
+    
     | let id '=' Exp ';'           { SLetInfer $2 $4 }
     
-    -- Atribuição: x = 10; ou v[i] = 10;
-    -- Importante: Usamos Exp no lado esquerdo (L-Value)
     | Exp '=' Exp ';'              { SAssign $1 $3 }
 
-    | read Exp ';'                 { SRead $2 }
+    | read '(' Exp ')' ';'              { SRead $3 }
+    | print '(' Exp ')' ';'             {SPrint $3} 
+
     
-    -- Controle de Fluxo
     | if '(' Exp ')' '{' Block '}' else '{' Block '}' { SIf $3 $6 $10 }
     | if '(' Exp ')' '{' Block '}'                    { SIf $3 $6 [] }
     | while '(' Exp ')' '{' Block '}'                 { SWhile $3 $6 }
-    | for '(' Stmt Exp ';' Stmt ')' '{' Block '}'     { SFor $3 $4 $6 $9 } -- Stmt já inclui o ';'
+    | for '(' Stmt Exp ';' StmtNoSemi ')' '{' Block '}'     { SFor $3 $4 $6 $9 } 
     
-    -- Retorno e Expressão solta
     | return Exp ';'               { SReturn $2 }
-    | Exp ';'                      { SExpr $1 } -- Chamada de função void: f();
+    | Exp ';'                      { SExpr $1 } 
 
--- ============================================================================
--- Expressões
--- ============================================================================
+StmtNoSemi
+    : Exp '++'                { SExpr (EIncrement $1) } -- i++
+
+
 
 Exp
-    -- Literais
-    : int_lit       { EValue (VInt $1) }
+   
+    : int_lit %prec PREC_INTLIT  { EValue (VInt $1) }
     | float_lit     { EValue (VFloat $1) }
     | str_lit       { EValue (VString $1) }
     | true          { EValue (VBool True) }
     | false         { EValue (VBool False) }
     | id            { EVar $1 }
+    | id '{' ExpList '}'  { EStruct $1 (reverse $3) }
 
-    -- Arrays e Structs
-    | '[' ExpList ']'      { EVector (reverse $2) } -- [1, 2, 3]
-    | new Type '[' Exp ']' { ENew $2 $4 }           -- new int[size]
+ 
+    | '[' ExpList ']'      { EVector (reverse $2) } 
+    | new Type '[' Exp ']' { ENew $2 $4 }           
     
-    -- Acessos (Precedência alta via %left)
-    | Exp '[' Exp ']'      { EIndex $1 $3 }         -- arr[i]
-    | Exp '.' id           { EField $1 $3 }         -- struct.field
-    
-    -- Chamada de Função: f(a, b) ou v.f(a)
+    | Exp '[' Exp ']'      { EIndex $1 $3 }         
+    | Exp '.' id           { EField $1 $3 }         
+
+    | Exp '++'             { EIncrement $1 }   
+   
     | Exp '(' ExpList ')'  { ECall $1 (reverse $3) }
     | Exp '(' ')'          { ECall $1 [] }
 
-    -- Operações Matemáticas
     | Exp '+' Exp   { $1 :+: $3 }
     | Exp '-' Exp   { $1 :-: $3 }
     | Exp '*' Exp   { $1 :*: $3 }
     | Exp '/' Exp   { $1 :/: $3 }
     | Exp '%' Exp   { $1 :%: $3 }
-    | '-' Exp %prec NEG { EMinus $2 } -- Menos unário
+    | '-' Exp %prec NEG { EMinus $2 } 
     
-    -- Operações Lógicas
     | Exp '&&' Exp  { $1 :&&: $3 }
     | Exp '||' Exp  { $1 :||: $3 }
     | '!' Exp       { ENot $2 }
     
-    -- Comparação
     | Exp '==' Exp  { $1 :==: $3 }
     | Exp '!=' Exp  { $1 :!=: $3 }
     | Exp '<' Exp   { $1 :<: $3 }
@@ -236,7 +229,6 @@ Exp
     | Exp '<=' Exp  { $1 :<=: $3 }
     | Exp '>=' Exp  { $1 :>=: $3 }
     
-    -- Parenteses
     | '(' Exp ')'   { $2 }
 
 ExpList
@@ -246,16 +238,17 @@ ExpList
 {
 parseError :: Token -> Alex a
 parseError (Token (l, c) lexeme) = 
-    alexError $ "Erro sintático na linha " ++ show l ++ ", coluna " ++ show c ++ 
-                ". Token inesperado: " ++ show lexeme
+    alexError $ "Syntax error on line " ++ show l ++ ", column " ++ show c ++ 
+            ". Unexpected token: " ++ show lexeme
 
--- Helper simples para distinguir type var de struct type
--- Por convenção neste parser, vamos assumir que se é 'id', virou Struct ou Var
--- A verificação real se é genérico acontece na Análise Semântica.
--- Aqui, simplificamos: se for uma letra minúscula isolada, pode ser considerado generic no contexto de tipo?
--- Para simplificar o parser, tratamos tudo como Struct/Var e o type checker decide.
--- Mas adicionei uma lógica básica na regra 'Type : id' usando essa função:
 isTypeVar :: String -> Bool
-isTypeVar (c:cs) = null cs && c `elem` ['a'..'z'] -- Ex: 'a', 'b' são type vars. 'Person' não.
+isTypeVar (c:cs) = null cs && c `elem` ['a'..'z'] 
 isTypeVar _ = False
+
+
+parseSL :: String -> Either String Sl
+parseSL input = runAlex input $ do
+  ast <- slParser
+  return ast
 }
+

@@ -2,11 +2,12 @@ module Main where
 
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
+import Data.Tree (drawTree)
 
--- Importações corretas
-import Frontend.Lexer.SlLexer (lexer, runAlex) -- Precisamos importar runAlex
+import Frontend.Lexer.SlLexer (lexer, runAlex) 
 import Frontend.Parser.SlParser (slParser)
 import Frontend.Pretty.SlPretty (prettyPrint) 
+import Frontend.Parser.AstToTree (astToTree)
 
 main :: IO ()
 main = do
@@ -26,7 +27,6 @@ printUsage = do
     putStrLn "  --pretty  : Formata o codigo original"
     exitFailure
 
--- Lexer puro (continua usando a função lexer que retorna lista)
 runLexer :: FilePath -> IO ()
 runLexer file = do
     content <- readFile file
@@ -36,7 +36,6 @@ runLexer file = do
             exitFailure
         Right tokens -> mapM_ print tokens 
 
--- Parser Monádico (Agora usamos runAlex passando o slParser)
 runParser :: FilePath -> IO ()
 runParser file = do
     content <- readFile file
@@ -44,9 +43,10 @@ runParser file = do
         Left err -> do
             putStrLn $ "Erro: " ++ err
             exitFailure
-        Right ast -> print ast 
+        Right ast -> do
+            let astStringTree = astToTree ast 
+            putStrLn (drawTree astStringTree)
 
--- Pretty Printer (Usa o Parser Monádico e depois imprime)
 runPretty :: FilePath -> IO ()
 runPretty file = do
     content <- readFile file
