@@ -12,6 +12,9 @@ library
       Frontend.Parser.SlParser
       Frontend.Parser.AstToTree
       Frontend.Pretty.SlPretty
+      Semantics.SlTypeEnv
+      Semantics.SlTypeChecker
+      Semantics.SlInterpreter
 
   default-language:    Haskell2010
 
@@ -20,6 +23,7 @@ library
     , array      >= 0.5
     , pretty     >= 1.1
     , containers >= 0.6
+    , mtl         >= 2.2
 
   build-tool-depends:
       alex:alex
@@ -44,6 +48,9 @@ executable slc
       Frontend.Parser.SlParser
       Frontend.Parser.AstToTree
       Frontend.Pretty.SlPretty
+      Semantics.SlTypeEnv
+      Semantics.SlTypeChecker
+      Semantics.SlInterpreter
 
   build-depends:
       base       >= 4.7 && < 5
@@ -51,6 +58,7 @@ executable slc
     , array
     , pretty
     , containers
+    , mtl
 
 
 
@@ -72,5 +80,6 @@ test-suite sl-tests
     , containers
     , tasty
     , tasty-hunit
+    , mtl
 
  

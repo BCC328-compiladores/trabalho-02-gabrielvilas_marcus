@@ -1,13 +1,16 @@
 module Main where
 
 import System.Environment (getArgs)
-import System.Exit (exitFailure)
+import System.Exit (exitFailure, exitSuccess)
 import Data.Tree (drawTree)
 
 import Frontend.Lexer.SlLexer (lexer, runAlex) 
 import Frontend.Parser.SlParser (slParser)
 import Frontend.Pretty.SlPretty (prettyPrint) 
 import Frontend.Parser.AstToTree (astToTree)
+
+import Semantics.SlTypeChecker (checkProgram)
+import Semantics.SlInterpreter (interpret)
 
 main :: IO ()
 main = do
@@ -16,6 +19,8 @@ main = do
         ["--lexer", file]  -> runLexer file
         ["--parser", file] -> runParser file
         ["--pretty", file] -> runPretty file
+        ["--check", file]  -> runCheck file 
+        ["--run", file]    -> runInterpreter file
         _ -> printUsage
 
 printUsage :: IO ()
@@ -25,6 +30,8 @@ printUsage = do
     putStrLn "  --lexer   : Executa apenas a analise lexica"
     putStrLn "  --parser  : Executa a analise sintatica"
     putStrLn "  --pretty  : Formata o codigo original"
+    putStrLn "  --check   : Executa a verificacao de tipos (Semantica)" 
+    putStrLn "  --run     : Executa o programa" 
     exitFailure
 
 runLexer :: FilePath -> IO ()
@@ -55,3 +62,36 @@ runPretty file = do
             putStrLn $ "Erro: " ++ err
             exitFailure
         Right ast -> putStrLn (prettyPrint ast)
+
+-- Função para rodar a Análise Semântica
+runCheck :: FilePath -> IO ()
+runCheck file = do
+    content <- readFile file
+    -- 1. Primeiro rodamos o Parser para obter a AST
+    case runAlex content slParser of
+        Left err -> do
+            putStrLn $ "Erro Sintatico: " ++ err
+            exitFailure
+        Right ast -> 
+            -- 2. Agora passamos a AST para o TypeChecker
+            case checkProgram ast of
+                Left typeErr -> do
+                    putStrLn "\n[ERRO] SEMANTICO ENCONTRADO:"
+                    print typeErr -- Vai usar o 'deriving Show' do TypeError
+                    exitFailure
+                Right _ -> do
+                    putStrLn "\n[SUCESSO] O programa esta semanticamente correto."
+                    exitSuccess
+
+runInterpreter :: FilePath -> IO ()
+runInterpreter file = do
+    content <- readFile file
+    case runAlex content slParser of
+        Left err -> do
+            putStrLn $ "Erro Sintatico: " ++ err
+            exitFailure
+        Right ast -> do
+            -- Opcional: Rodar o TypeChecker antes para garantir
+            case checkProgram ast of
+                Left err -> putStrLn "Erro de Tipo detectado antes da execucao:" >> print err >> exitFailure
+                Right _ -> interpret ast 
