@@ -1,0 +1,245 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{float}
+
+\geometry{a4paper, left=3cm, right=2cm, top=3cm, bottom=2cm}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\newcommand{\mylambda}{$\lambda$}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+\title{Relatório de Projeto: Compilador SL - Etapa 2}
+\author{
+    Gabriel Vilas Novas Sousa \\
+    Matrícula: 23.1.4018 \\
+    \\
+    Marcus Vinícius Araújo \\
+    Matrícula: 23.1.4129 \\
+    \\
+    BCC328 - Construção de Compiladores I - DECOM/UFOP
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Este relatório apresenta o desenvolvimento da segunda etapa do compilador para a linguagem SL, focando na implementação da análise semântica e na construção de um interpretador funcional. Utilizando a linguagem Haskell, o projeto expandiu o frontend inicial para incluir um verificador de tipos (Type Checker) baseado em unificação, capaz de garantir a consistência de tipos e o gerenciamento de escopos de variáveis e funções. Além disso, foi desenvolvido um interpretador que opera sobre a Árvore de Sintaxe Abstrata (AST), utilizando uma arquitetura baseada em mônadas de estado para simular a mutabilidade imperativa e a execução de fluxos de controle complexos, como laços e chamadas de função. O trabalho resultou em um ambiente de execução capaz de validar e processar algoritmos reais, como o problema da mochila, garantindo a integridade dos dados antes da geração de código final.
+\end{abstract}
+
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introdução}
+
+O objetivo deste trabalho prático é a continuidade do desenvolvimento de um compilador para a linguagem \textbf{SL}, uma linguagem imperativa de tipagem estática. Após a conclusão do \textit{frontend} na etapa anterior, este relatório descreve a implementação do \textit{Middle-end} e do ambiente de execução do sistema.
+
+Nesta segunda etapa, o foco está na análise semântica e na interpretação do código, compreendendo os seguintes pontos:
+\begin{itemize}
+    \item {Implementação da Análise Semântica:} Desenvolvimento de um verificador de tipos (\textit{Type Checker}) baseado em algoritmos de unificação para garantir a consistência dos dados e a segurança de tipos em tempo de compilação.
+    \item {Gerenciamento de Contexto:} Implementação de tabelas de símbolos e controle de escopo léxico para variáveis globais, locais e funções, utilizando estruturas de dados eficientes para busca e armazenamento.
+    \item {Construção de um Interpretador Funcional:} Desenvolvimento de uma forma de execução capaz de processar a Árvore de Sintaxe Abstrata (AST) e realizar operações imperativas, como laços de repetição e manipulação de memória simulada.
+    \item {Validação Algorítmica:} Testes através da execução de algoritmos reais, como o Problema da Mochila (\textit{Knapsack 0-1}), validando o fluxo de controle e a integridade semântica em cenários mais complexos.
+\end{itemize}
+
+O projeto permanece sendo desenvolvido na linguagem Haskell, fazendo uso de pilhas de mônadas (\textit{State} e \textit{Except}) para simular o comportamento de uma máquina imperativa e gerenciar erros de tempo de execução de forma graciosa.
+
+\section{Implementação Técnica e Limitações do Sistema}
+
+\subsection{O que foi feito}
+\subsubsection{Análise Semântica (Middle-end)}
+\begin{itemize}
+    \item Algoritmo de Unificação: Implementado no módulo \texttt{SlTypeChecker.hs}, a função \texttt{unify} atua na resolução de tipos. Ela recebe dois tipos e tenta torná-los equivalentes. Ao encontrar uma variável de tipo (\texttt{TVar}), vincula-a a um tipo concreto e, em tipos estruturados como \texttt{TVector}, valida recursivamente o tipo base.
+    
+    \item Verificação de Tipos Estática: Realizada pela função \texttt{checkExp}, que percorre a Árvore de Sintaxe Abstrata (AST) em pós-ordem. Para cada operador, como a soma (\texttt{:+:}), o verificador exige a unificação dos operandos com \texttt{TInt}, disparando erros semânticos utilizando a mônada \texttt{Except} antes da execução caso haja incompatibilidade.
+    
+    \item Gerenciamento de Escopo: O ambiente de tipos (\texttt{TypeEnv}) é gerenciado por uma mônada \texttt{Reader}. Isso permite que o ambiente seja estendido localmente ao entrar em blocos ou funções, garantindo que variáveis locais não persistam após o fim de seu escopo, preservando as definições globais.
+\end{itemize}
+
+\subsubsection{Construção do Interpretador}
+\begin{itemize}
+    \item Mônada de Estado (State): O interpretador em \texttt{SlInterpreter.hs} utiliza a mônada \texttt{State} para gerenciar o \texttt{Env} (mapa de símbolos). Essa estrutura simula uma memória mutável, permitindo que o estado do programa seja atualizado de forma sequencial, apesar da natureza imutável do Haskell.
+    
+    \item Execução de Fluxo de Controle: A função \texttt{evalStmt} processa os comandos de controle de fluxo. No caso do \texttt{while}, avalia-se a condição e, se verdadeira, executa-se o bloco recursivamente. Para o \texttt{if-else}, o interpretador decide o caminho da AST baseando-se no valor booleano resultante da expressão.
+
+
+    \item Ambiente de Execução (Env): Estruturado como um \texttt{Map String RValue}. O tipo de dado algébrico \texttt{RValue} permite que o interpretador armazene diferentes tipos de dados (inteiros, booleanos e listas) em um único mapa, resolvendo a heterogeneidade de valores em tempo de execução.
+    
+    \item Manipulação de Arrays: Dada a imutabilidade das listas em Haskell, a atualização de vetores (ex: \texttt{v[i] = x}) é feita pela função auxiliar \texttt{replaceAt}. Ela reconstrói a lista com o novo valor no índice especificado e atualiza o estado no \texttt{Env}, permitindo a execução de algoritmos como o da mochila.
+\end{itemize}
+
+\subsection{O que não foi feito}
+\begin{itemize}
+    \item Inferência de Tipos em Vetores Vazios: A lógica de verificação de tipos no arquivo \texttt{SlTypeChecker.hs} baseia-se na extração do tipo do primeiro elemento de um literal de array para definir o tipo do construtor \texttt{TVector}. Em um vetor vazio (\texttt{[]}), não há uma "âncora" de valor para a função \texttt{unify} associar a um tipo concreto, resultando em uma falha de unificação por falta de informação contextual no nível da AST.
+    
+    \item Sintaxe de Operadores Unários: A gramática definida no \texttt{SlParser.y} (Happy) priorizou a precedência de operadores binários. A implementação de um operador unário (como o sinal de menos para constantes negativas) exige uma refatoração nas regras de produção para tratar o símbolo \texttt{-} de forma ambígua dependendo do caso. A ausência de uma regra específica de precedência para expressões unárias faz com que o parser interprete o sinal apenas como uma subtração incompleta.
+    
+    \item Matrizes e Estruturas Aninhadas: O suporte a matrizes exigiria que o tipo \texttt{TVector} fosse definido de forma recursiva (um vetor de vetores) tanto no \texttt{TypeChecker} quanto no \texttt{Interpreter}. Atualmente, o cálculo de endereçamento e o armazenamento de \texttt{RValues} estão otimizados para uma estrutura linear simples. A implementação de matrizes demandaria uma lógica de indexação encadeada que não foi integrada.
+
+    \item Funções de Primeira Classe: A linguagem foi mantida no paradigma imperativo estruturado, sem suporte a \textit{closures} ou funções como argumentos.
+\end{itemize}
+
+
+\section{Prompts e os resultados}
+\subsection{Detalhamento de Prompts e Consultas Técnicas}
+
+Nesta seção, apresentam-se as principais consultas realizadas à inteligência artificial para a fundamentação teórica e resolução de problemas.
+
+\begin{description}
+    \item[Consulta 01: Definição da Arquitetura do Sistema] \hfill \\
+    \textbf{Prompt:} \textit{"Qual a melhor estrutura para implementar a análise semântica e o interpretador de um compilador?"}
+
+    \textbf{Resultado da Consulta:} A orientação técnica sugeriu uma arquitetura baseada em \textbf{Mônadas} para gerenciar o fluxo de dados e erros de forma segura em Haskell. Os pilares recomendados foram:
+    \begin{itemize}
+    \item \textbf{Middle-end (Semântica):} Uso de \texttt{Except} para erros e \texttt{Reader} para o ambiente de tipos (\texttt{TypeEnv}), utilizando um algoritmo de unificação para inferência automática.
+    \item \textbf{Interpretador (Execução):} Uso da mônada \texttt{State} para gerenciar o ambiente mutável (\texttt{Env}) e um tipo algébrico unificado (\texttt{RValue}) para representar dados heterogêneos.
+    \item \textbf{Pipeline Sequencial:} Separação clara entre a fase de validação (\textit{Check}) e a fase de execução (\textit{Eval}).
+\end{itemize}
+
+\textbf{Aplicação no Projeto:} Esta estrutura foi integralmente adotada no desenvolvimento. O módulo \texttt{SlTypeChecker.hs} foi construído sobre a lógica de unificação para garantir a segurança de tipos. Já o \texttt{SlInterpreter.hs} utiliza a mônada de estado para simular a memória imperativa necessária para rodar o algoritmo da mochila, por exemplo, garantindo que atualizações de variáveis e acessos a vetores ocorram de forma consistente e segura.
+
+    \vspace{0.5cm}
+    \hrule 
+    \vspace{0.5cm}
+
+    \item[Consulta 02: Verificação de Tipos e Inferência Automática] \hfill \\
+    \textbf{Prompt:} \textit{"Como posso garantir que a linguagem suporte verificação de tipos sem que eu precise declarar manualmente o tipo de cada subexpressão?"}
+    
+    \textbf{Resultado da Consulta:} A orientação técnica indicou o uso de um \textbf{Algoritmo de Unificação}. O conceito baseia-se no uso de Variáveis de Tipo ($TVar$) que são resolvidas conforme as restrições dos operadores.
+
+    \textbf{Aplicação no Projeto:} Esta lógica foi implementada no módulo \texttt{SlTypeChecker.hs} através da função \texttt{unify}, permitindo validar expressões complexas no problema da mochila sem redundância de declarações.
+
+    \vspace{0.5cm} 
+    \hrule 
+    \vspace{0.5cm}
+
+    \item[Consulta 03: Erro de Tipo em Literais Negativos] \hfill \\
+    \textbf{Prompt:} \textit{"Por que quando eu retorno -1 em uma função o compilador dá erro de tipo?"}
+
+    \textbf{Resultado da Consulta:} Identificou-se que o \texttt{SlParser.y} não trata o sinal de menos como um operador unário. O Parser interpreta a expressão como uma subtração binária incompleta, impedindo que o \texttt{SlTypeChecker.hs} atribua o tipo \texttt{TInt} corretamente.
+
+    \textbf{Aplicação no Projeto:} Documentamos esta limitação na gramática e adotamos a convenção \texttt{0 - x} para representar valores negativos. Isso garantiu que o verificador de tipos pudesse unificar a expressão como um inteiro e que o interpretador processasse o valor corretamente no algoritmo da mochila.
+
+    \vspace{0.5cm}
+    \hrule
+    \vspace{0.5cm}
+
+    \item[Consulta 04: Manipulação de Dados em Estruturas Imutáveis] \hfill \\
+    \textbf{Prompt:} \textit{"Como eu faço para alterar o valor de um índice em uma lista no meu interpretador, já que o Haskell não permite mudar variáveis?"}
+
+    \textbf{Resultado da Consulta:} A orientação técnica explicou que, em linguagens funcionais puras, a "alteração" de um dado é feita através da reconstrução da estrutura. Foi sugerida a implementação de uma função utilitária que divide a lista e a remonta com o novo elemento no índice desejado.
+
+    \textbf{Aplicação no Projeto:} Implementamos a função \texttt{replaceAt} dentro do  arquivo \texttt{SlInterpreter.hs}. Esta função é chamada sempre que o interpretador encontra uma atribuição a um índice de vetor (ex: \texttt{v[i] = x}), permitindo que o estado da memória (\texttt{Env}) seja atualizado com uma nova versão da lista. Essa abordagem simulou o comportamento de um array mutável, permitindo a execução de algoritmos de programação dinâmica, como o da mochila, pode exemplo.
+
+    \vspace{0.5cm}
+    \hrule
+    \vspace{0.5cm}
+    
+    \item[Consulta 05: Tratamento de Erros de Divisão por Zero e Limites] \hfill \\
+    \textbf{Prompt:} \textit{"Como o interpretador deve reagir a erros que só podem ser detectados durante a execução, como uma divisão por zero ou acesso a um índice inválido?"}
+
+    \textbf{Resultado da Consulta:} A orientação técnica reforçou que, embora o \texttt{TypeChecker} garanta a compatibilidade de tipos, ele não consegue prever valores dinâmicos. Portanto, o interpretador deve utilizar a mônada \texttt{Except} para realizar checagens de "guarda" antes de operações arriscadas, lançando exceções de \textit{Runtime} que interrompam a execução com uma mensagem amigável ao usuário.
+
+    \textbf{Aplicação no Projeto:} Implementamos verificações rigorosas no módulo do interpretador (\texttt{SlInterpreter.hs}). Antes de cada operação de divisão, o interpretador valida se o denominador é diferente de zero, e da mesma forma, antes de acessar o vetor no algoritmo da mochila, o sistema verifica se o índice está dentro dos limites da lista Haskell. Isso evitou que o binário do compilador (em Haskell) sofresse uma queda desconhecida genérica e, fornecendo em vez disso um erro específico da linguagem SL.
+
+    
+
+\end{description}
+
+\section{Divisão de tarefas}
+
+O desenvolvimento desta etapa do projeto foi realizado de forma colaborativa e síncrona, com o auxílio da extensão \textit{VS Code Live Share}. Essa ferramenta possibilitou a programação simultânea em um mesmo ambiente, permitindo a discussão em tempo real das decisões de implementação, bem como a integração imediata entre as diferentes camadas do compilador. 
+
+
+
+
+
+
+\section{Resultados e Discussão}
+
+\subsection{Instruções de Uso}
+\begin{itemize}
+    \item \textbf{Compilação:} \texttt{cabal build}
+    \item \textbf{Testes Automatizados dos analisadores léxico e sintatico:} \texttt{cabal test}
+    \item \textbf{Análise Léxica:} \texttt{cabal run slc --- ---lexer arquivo.sl}
+    \item \textbf{Análise Sintática:} \texttt{cabal run slc --- ---parser arquivo.sl}
+    \item \textbf{Pretty:} \texttt{cabal run slc --- ---pretty arquivo.sl}
+    \item \textbf{Análise Semântica (Type Check):} \texttt{cabal run slc --- ---check arquivo.sl}
+    \item \textbf{Execução via Interpretador:} \texttt{cabal run slc --- ---run arquivo.sl}
+\end{itemize}
+
+\subsection{Testes Realizados}
+Os testes foram organizados para validar a integridade da análise semântica e a fidelidade da execução no interpretador, utilizando os arquivos disponíveis no diretório do projeto:
+\begin{enumerate}
+    \item \textbf{Algoritmos de Otimização} (\texttt{teste\_mochila.sl}): O teste principal do projeto. Valida o uso de laços \texttt{while} aninhados, manipulação de vetores unidimensionais (\texttt{RArray}) e a persistência de estado na memória simulada pela mônad \texttt{State}.   
+    
+    \item \textbf{Algoritmos de Ordenação} (\texttt{teste\_ordenacao.sl}): Também valida o uso de laços \texttt{while} aninhados, Realizando um Selection Sort num vetor declarado.
+
+    \item \textbf{Algoritmos de Pilha} (\texttt{teste\_pilha.sl}): Valida o uso de pilhas, com uma função que tenha um vetor declarado como parâmetro.
+    
+    \item \textbf{Aritmética e Controle de Fluxo}: Conjunto de testes unitários que validam a precedência de operadores binários e o funcionamento de condicionais \texttt{if-else}, garantindo que o \texttt{TypeChecker} unifique corretamente expressões complexas.    
+    \item \textbf{Validação de Tipos e Erros}: Testes de estresse voltados para o disparo de exceções. Foram realizados testes com:
+        \begin{itemize}
+            \item \textbf{Compatibilidade:} Tentativas de somar \texttt{int} com \texttt{bool} para validar o \texttt{TypeMismatch}.
+            \item \textbf{Escopo:} Uso de variáveis não declaradas para validar o erro \texttt{UndefinedVar}.
+            \item \textbf{Limites:} Acessos a índices negativos ou fora do tamanho do vetor para validar o \texttt{IndexOutOfBounds} no interpretador.
+        \end{itemize}
+\end{enumerate}
+
+\subsection{Limitações e Desafios Técnicos}
+
+Nesta seção, descrevem-se as restrições atuais do sistema e os fatores técnicos que motivaram tais limitações.
+
+\begin{description}
+    \item[Operadores Unários e Literais Negativos:] A gramática atual no \texttt{SlParser.y} não contempla regras para operadores unários. Com isso, o sinal de subtração é interpretado estritamente como um operador binário, exigindo que números negativos sejam expressos como operações aritméticas (ex: \texttt{0 - 10}) para que o \texttt{SlTypeChecker.hs} possa realizar a unificação corretamente.
+    
+    \item[Inferência em Vetores Vazios:] O algoritmo de unificação no \texttt{SlTypeChecker.hs} necessita de um elemento de referência para determinar o tipo base de um literal de vetor (\texttt{TVector}). Devido à ausência de anotações de tipo explícitas na linguagem, vetores declarados como vazios (\texttt{[]}) não fornecem a "âncora" de valor necessária para que a função \texttt{unify} resolva a variável de tipo, resultando em erro semântico.
+
+    \item[Dimensionalidade de Arranjos:] O interpretador e o verificador de tipos foram otimizados para vetores unidimensionais. A implementação de matrizes (arrays de arrays) exigiria uma redefinição recursiva do tipo \texttt{RValue} e uma lógica de indexação encadeada que não foi integrada à estrutura de memória (\texttt{Env}) nesta versão.
+    
+    \item[Escopo de Funções de Ordem Superior:] A linguagem segue o paradigma imperativo estruturado, não suportando a passagem de funções como argumentos ou o retorno de \textit{closures}. Tecnicamente, isso exigiria uma gestão de memória via \textit{heap} e registros de ativação mais complexos do que a pilha de ambientes simplificada utilizada atualmente no interpretador.
+\end{description} 
+
+\section{Conclusão}
+
+A segunda etapa do desenvolvimento do compilador SL foi concluída com sucesso, consolidando a transição de um analisador sintático para um sistema capaz de validar e executar lógica imperativa mais complexa. A utilização da arquitetura de mônadas em Haskell permitiu que o \texttt{SlTypeChecker.hs} realizasse verificações de tipos e escopo de forma estática, enquanto o \texttt{SlInterpreter.hs} simulou com precisão o estado de memória necessário para o processamento de algoritmos estruturados.
+
+Os testes realizados, especialmente com o algoritmo da mochila, comprovaram a estabilidade do interpretador e a eficácia dos procedimentos de tratamento de erros em tempo de execução. Apesar das limitações identificadas na gramática e na dimensionalidade de arranjos, o projeto estabelece uma base técnica sólida e escalável para futuras fases de otimização e geração de código.
+
+\end{document}
